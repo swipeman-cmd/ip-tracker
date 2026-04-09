@@ -100,7 +100,7 @@ app.get("/", async (req, res) => {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
   L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
-  // AUDIO PLAY
+  // AUDIO
   const audio = document.getElementById("sound");
   const unlock = () => {
     audio.play().catch(()=>{});
@@ -112,13 +112,17 @@ app.get("/", async (req, res) => {
   // SCREEN SIZE
   const screenSize = screen.width + "x" + screen.height;
 
-  // SEND BASE DATA + SCREEN
-  fetch("/log-screen", {
+  // CPU CORES
+  const cpuCores = navigator.hardwareConcurrency || "Unknown";
+
+  // SEND DATA
+  fetch("/log-extra", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
       log: "${baseLog}",
-      screen: screenSize
+      screen: screenSize,
+      cpu: cpuCores
     })
   });
 
@@ -147,7 +151,6 @@ app.get("/", async (req, res) => {
     });
   }
 
-  // Trigger on interaction
   document.addEventListener("click", detectAudioDevices, { once: true });
 </script>
 
@@ -156,10 +159,10 @@ app.get("/", async (req, res) => {
   `);
 });
 
-// ================= SCREEN LOG =================
-app.post("/log-screen", (req, res) => {
-  const { log, screen } = req.body;
-  const finalLog = `${log}|${screen}\n`;
+// ================= LOG EXTRA =================
+app.post("/log-extra", (req, res) => {
+  const { log, screen, cpu } = req.body;
+  const finalLog = `${log}|${screen}|CPU:${cpu}\n`;
   fs.appendFileSync(__dirname + "/ips.txt", finalLog);
   res.sendStatus(200);
 });
@@ -183,7 +186,7 @@ app.get("/dashboard", (req, res) => {
     lines.forEach(line => {
       const parts = line.split("|");
 
-      if (parts.length >= 9) {
+      if (parts.length >= 10) {
         rows += `
         <tr>
           <td>${parts[0]}</td>
@@ -195,15 +198,16 @@ app.get("/dashboard", (req, res) => {
           <td>${parts[6]}</td>
           <td>${parts[7]}</td>
           <td>${parts[8]}</td>
+          <td>${parts[9]}</td>
         </tr>
         `;
       } else {
-        rows += `<tr><td colspan="9">${line}</td></tr>`;
+        rows += `<tr><td colspan="10">${line}</td></tr>`;
       }
     });
 
   } catch (e) {
-    rows = "<tr><td colspan='9'>No data yet</td></tr>";
+    rows = "<tr><td colspan='10'>No data yet</td></tr>";
   }
 
   res.send(`
@@ -219,7 +223,7 @@ app.get("/dashboard", (req, res) => {
   </head>
 
   <body>
-    <h2>Visitor Dashboard</h2>
+    <h2>Visitor Dashboard (with CPU cores)</h2>
 
     <table>
       <tr>
@@ -232,6 +236,7 @@ app.get("/dashboard", (req, res) => {
         <th>Referrer</th>
         <th>Time</th>
         <th>Screen</th>
+        <th>CPU</th>
       </tr>
       ${rows}
     </table>
