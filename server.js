@@ -35,7 +35,6 @@ app.get("/", async (req, res) => {
       lat = response.data.lat;
       lon = response.data.lon;
     }
-
   } catch (e) {
     console.log("Location error:", e.message);
   }
@@ -51,7 +50,6 @@ app.get("/", async (req, res) => {
 <head>
   <title>Visitor Map</title>
 
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
   <style>
@@ -85,12 +83,22 @@ app.get("/", async (req, res) => {
       color: #667eea;
       font-weight: bold;
     }
+
+    button {
+      margin-top: 10px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      background: #667eea;
+      color: white;
+      cursor: pointer;
+    }
   </style>
 </head>
 
 <body>
 
-<audio id="sound" loop>
+<audio id="sound" loop playsinline>
   <source src="/myinstants.mp3" type="audio/mpeg">
 </audio>
 
@@ -102,37 +110,49 @@ app.get("/", async (req, res) => {
   <div class="info">Browser: <span class="highlight">${browser}</span></div>
   <div class="info">OS: <span class="highlight">${os}</span></div>
   <div class="info">Device: <span class="highlight">${device}</span></div>
+
+  <!-- Fallback button for mobile -->
+  <button onclick="startAudio()">Enable Sound 🔊</button>
 </div>
 
 <div id="map"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-  // Initialize map
+  // MAP
   var map = L.map('map').setView([${lat}, ${lon}], 10);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // Add marker
   L.marker([${lat}, ${lon}]).addTo(map)
     .bindPopup("Visitor Location")
     .openPopup();
 
-  // Audio play on click
+  // AUDIO FIX (WORKS ON ANDROID + DESKTOP)
   const audio = document.getElementById("sound");
 
-  const startAudio = () => {
-    audio.play();
-    document.removeEventListener("click", startAudio);
-    document.removeEventListener("touchstart", startAudio);
+  function startAudio() {
+    audio.play().then(() => {
+      console.log("Audio started");
+    }).catch(err => {
+      console.log("Playback failed:", err);
+    });
+  }
+
+  const triggerAudio = () => {
+    startAudio();
+
+    document.removeEventListener("click", triggerAudio);
+    document.removeEventListener("touchstart", triggerAudio);
+    document.removeEventListener("pointerdown", triggerAudio);
   };
 
-  document.addEventListener("click", startAudio);
-  document.addEventListener("touchstart", startAudio);
+  document.addEventListener("click", triggerAudio);
+  document.addEventListener("touchstart", triggerAudio);
+  document.addEventListener("pointerdown", triggerAudio);
 </script>
 
 </body>
