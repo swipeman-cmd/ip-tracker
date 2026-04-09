@@ -9,7 +9,6 @@ app.set("trust proxy", true);
 app.use(express.static(__dirname));
 app.use(express.urlencoded({ extended: true }));
 
-// ================= MAIN PAGE =================
 app.get("/", async (req, res) => {
   let ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
 
@@ -38,7 +37,13 @@ app.get("/", async (req, res) => {
     }
   } catch (e) {}
 
-  const log = `${ip}|${city}, ${country}|${browser}|${os}|${device}|${new Date().toISOString()}\n`;
+  // ✅ IST TIME FIX
+  const time = new Date().toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata"
+  });
+
+  const log = `${ip}|${city}, ${country}|${browser}|${os}|${device}|${time}\n`;
+
   fs.appendFileSync(__dirname + "/ips.txt", log);
 
   res.send(`
@@ -93,7 +98,6 @@ app.get("/", async (req, res) => {
 
   L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
-  // AUDIO
   const audio = document.getElementById("sound");
   const unlock = () => {
     audio.play().catch(()=>{});
@@ -108,7 +112,7 @@ app.get("/", async (req, res) => {
   `);
 });
 
-// ================= DASHBOARD (STILL EXISTS) =================
+// DASHBOARD
 app.get("/dashboard", (req, res) => {
   let rows = "";
 
@@ -148,7 +152,7 @@ app.get("/dashboard", (req, res) => {
   </head>
 
   <body>
-    <h2>Visitor Dashboard</h2>
+    <h2>Visitor Dashboard (IST)</h2>
 
     <table>
       <tr>
@@ -157,7 +161,7 @@ app.get("/dashboard", (req, res) => {
         <th>Browser</th>
         <th>OS</th>
         <th>Device</th>
-        <th>Time</th>
+        <th>Time (IST)</th>
       </tr>
       ${rows}
     </table>
