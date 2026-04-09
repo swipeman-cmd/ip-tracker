@@ -10,6 +10,9 @@ app.use(express.static(__dirname));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// TEMP STORAGE (per request simulation)
+let tempStore = {};
+
 // ================= MAIN PAGE =================
 app.get("/", async (req, res) => {
   let ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
@@ -46,6 +49,9 @@ app.get("/", async (req, res) => {
   });
 
   const baseLog = `${ip}|${city}, ${country}|${browser}|${os}|${device}|${isp}|${referrer}|${time}`;
+
+  // store temporarily
+  tempStore[ip] = { baseLog };
 
   res.send(`
 <!DOCTYPE html>
@@ -100,7 +106,7 @@ app.get("/", async (req, res) => {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
   L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
-  // AUDIO unlock
+  // AUDIO PLAY
   const audio = document.getElementById("sound");
   const unlock = () => {
     audio.play().catch(()=>{});
@@ -109,7 +115,6 @@ app.get("/", async (req, res) => {
   const events = ["click","touchstart","scroll","keydown"];
   events.forEach(e=>document.addEventListener(e, unlock, {once:true}));
 
-  // SCREEN + CPU
   const screenSize = screen.width + "x" + screen.height;
   const cpu = navigator.hardwareConcurrency || "Unknown";
 
@@ -117,15 +122,14 @@ app.get("/", async (req, res) => {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
-      log: "${baseLog}",
+      ip: "${ip}",
       screen: screenSize,
       cpu: cpu
     })
   });
 
-  // AUDIO DEVICES
-  async function detectAudioDevices() {
-    let mic = "Not allowed";
+  async function detectAudio() {
+    let mic = "Denied";
     let speakers = "Unknown";
 
     try {
@@ -134,44 +138,38 @@ app.get("/", async (req, res) => {
 
       mic = devices.some(d => d.kind === "audioinput") ? "Yes" : "No";
       speakers = devices.some(d => d.kind === "audiooutput") ? "Yes" : "No";
-
-    } catch (err) {
-      mic = "Denied";
-      speakers = "Unknown";
-    }
+    } catch {}
 
     fetch("/log-audio", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ mic, speakers })
+      body: JSON.stringify({ ip: "${ip}", mic, speakers })
     });
   }
 
-  document.addEventListener("click", detectAudioDevices, { once: true });
-
-  // BATTERY
-  async function getBatteryInfo() {
+  async function detectBattery() {
     let level = "Not supported";
     let charging = "Unknown";
 
     try {
       if (navigator.getBattery) {
-        const battery = await navigator.getBattery();
-        level = Math.round(battery.level * 100) + "%";
-        charging = battery.charging ? "Yes" : "No";
+        const b = await navigator.getBattery();
+        level = Math.round(b.level * 100) + "%";
+        charging = b.charging ? "Yes" : "No";
       }
-    } catch (e) {
-      level = "Error";
-    }
+    } catch {}
 
     fetch("/log-battery", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ level, charging })
+      body: JSON.stringify({ ip: "${ip}", level, charging })
     });
   }
 
-  document.addEventListener("click", getBatteryInfo, { once: true });
+  document.addEventListener("click", () => {
+    detectAudio();
+    detectBattery();
+  }, { once: true });
 </script>
 
 </body>
@@ -179,24 +177,37 @@ app.get("/", async (req, res) => {
   `);
 });
 
-// ================= LOG EXTRA =================
+// ================= EXTRA =================
 app.post("/log-extra", (req, res) => {
-  const { log, screen, cpu } = req.body;
-  fs.appendFileSync(__dirname + "/ips.txt", `${log}|${screen}|CPU:${cpu}\n`);
+  const { ip, screen, cpu } = req.body;
+
+  tempStore[ip].screen = screen;
+  tempStore[ip].cpu = cpu;
+
   res.sendStatus(200);
 });
 
-// ================= AUDIO LOG =================
+// ================= AUDIO =================
 app.post("/log-audio", (req, res) => {
-  const { mic, speakers } = req.body;
-  fs.appendFileSync(__dirname + "/ips.txt", `Audio | Mic:${mic} | Speakers:${speakers}\n`);
+  const { ip, mic, speakers } = req.body;
+
+  tempStore[ip].audio = `Mic:${mic}, Speakers:${speakers}`;
+
   res.sendStatus(200);
 });
 
-// ================= BATTERY LOG =================
+// ================= BATTERY =================
 app.post("/log-battery", (req, res) => {
-  const { level, charging } = req.body;
-  fs.appendFileSync(__dirname + "/ips.txt", `Battery | ${level} | Charging:${charging}\n`);
+  const { ip, level, charging } = req.body;
+
+  const data = tempStore[ip];
+
+  const finalLog = `${data.baseLog}|${data.screen}|CPU:${data.cpu}|${data.audio}|Battery:${level}, Charging:${charging}\n`;
+
+  fs.appendFileSync(__dirname + "/ips.txt", finalLog);
+
+  delete tempStore[ip];
+
   res.sendStatus(200);
 });
 
@@ -205,64 +216,43 @@ app.get("/dashboard", (req, res) => {
   let rows = "";
 
   try {
-    const data = fs.readFileSync(__dirname + "/ips.txt", "utf-8");
-    const lines = data.trim().split("\n").reverse();
+    const lines = fs.readFileSync("ips.txt", "utf-8").split("\n").reverse();
 
     lines.forEach(line => {
-      if (
-        line.includes("127.0.0.1") ||
-        line.includes("undefined") ||
-        !line.includes("|")
-      ) return;
+      if (!line.includes("|")) return;
 
-      const parts = line.split("|");
+      const p = line.split("|");
 
-      if (parts.length >= 10) {
+      if (p.length >= 12) {
         rows += `
         <tr>
-          <td>${parts[0]}</td>
-          <td>${parts[1]}</td>
-          <td>${parts[2]}</td>
-          <td>${parts[3]}</td>
-          <td>${parts[4]}</td>
-          <td>${parts[5]}</td>
-          <td>${parts[6]}</td>
-          <td>${parts[7]}</td>
-          <td>${parts[8]}</td>
-          <td>${parts[9]}</td>
+          <td>${p[0]}</td>
+          <td>${p[1]}</td>
+          <td>${p[2]}</td>
+          <td>${p[3]}</td>
+          <td>${p[4]}</td>
+          <td>${p[5]}</td>
+          <td>${p[6]}</td>
+          <td>${p[7]}</td>
+          <td>${p[8]}</td>
+          <td>${p[9]}</td>
+          <td>${p[10]}</td>
+          <td>${p[11]}</td>
         </tr>`;
       }
     });
 
-  } catch (e) {
-    rows = "<tr><td colspan='10'>No data yet</td></tr>";
-  }
+  } catch {}
 
   res.send(`
   <html>
-  <head>
-    <title>Dashboard</title>
-    <style>
-      body { font-family: Arial; background:#f4f6f9; padding:20px; }
-      table { width:100%; border-collapse: collapse; background:white; }
-      th, td { padding:10px; border:1px solid #ddd; }
-      th { background:#667eea; color:white; }
-    </style>
-  </head>
-  <body>
+  <body style="font-family:Arial;padding:20px">
     <h2>Visitor Dashboard</h2>
-    <table>
+    <table border="1" cellpadding="10">
       <tr>
-        <th>IP</th>
-        <th>Location</th>
-        <th>Browser</th>
-        <th>OS</th>
-        <th>Device</th>
-        <th>ISP</th>
-        <th>Referrer</th>
-        <th>Time</th>
-        <th>Screen</th>
-        <th>CPU</th>
+        <th>IP</th><th>Location</th><th>Browser</th><th>OS</th>
+        <th>Device</th><th>ISP</th><th>Referrer</th><th>Time</th>
+        <th>Screen</th><th>CPU</th><th>Audio</th><th>Battery</th>
       </tr>
       ${rows}
     </table>
@@ -271,8 +261,4 @@ app.get("/dashboard", (req, res) => {
   `);
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
-});
+app.listen(process.env.PORT || 3000);
