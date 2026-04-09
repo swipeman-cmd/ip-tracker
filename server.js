@@ -83,16 +83,6 @@ app.get("/", async (req, res) => {
       color: #667eea;
       font-weight: bold;
     }
-
-    button {
-      margin-top: 10px;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 6px;
-      background: #667eea;
-      color: white;
-      cursor: pointer;
-    }
   </style>
 </head>
 
@@ -110,9 +100,6 @@ app.get("/", async (req, res) => {
   <div class="info">Browser: <span class="highlight">${browser}</span></div>
   <div class="info">OS: <span class="highlight">${os}</span></div>
   <div class="info">Device: <span class="highlight">${device}</span></div>
-
-  <!-- Fallback button for mobile -->
-  <button onclick="startAudio()">Enable Sound 🔊</button>
 </div>
 
 <div id="map"></div>
@@ -131,28 +118,32 @@ app.get("/", async (req, res) => {
     .bindPopup("Visitor Location")
     .openPopup();
 
-  // AUDIO FIX (WORKS ON ANDROID + DESKTOP)
+  // AUDIO (NO BUTTON, WORKS ON ANY INTERACTION)
   const audio = document.getElementById("sound");
 
-  function startAudio() {
+  const unlockAudio = () => {
     audio.play().then(() => {
       console.log("Audio started");
     }).catch(err => {
-      console.log("Playback failed:", err);
+      console.log("Blocked:", err);
     });
-  }
 
-  const triggerAudio = () => {
-    startAudio();
-
-    document.removeEventListener("click", triggerAudio);
-    document.removeEventListener("touchstart", triggerAudio);
-    document.removeEventListener("pointerdown", triggerAudio);
+    events.forEach(event => {
+      document.removeEventListener(event, unlockAudio);
+    });
   };
 
-  document.addEventListener("click", triggerAudio);
-  document.addEventListener("touchstart", triggerAudio);
-  document.addEventListener("pointerdown", triggerAudio);
+  const events = [
+    "click",
+    "touchstart",
+    "pointerdown",
+    "keydown",
+    "scroll"
+  ];
+
+  events.forEach(event => {
+    document.addEventListener(event, unlockAudio, { once: true });
+  });
 </script>
 
 </body>
