@@ -20,7 +20,6 @@ app.get("/", async (req, res) => {
   const referrer = req.headers.referer || "Direct";
 
   const parser = new UAParser(req.headers["user-agent"]);
-
   const browser = parser.getBrowser().name || "Unknown";
   const os = parser.getOS().name || "Unknown";
   const device = parser.getDevice().type || "Desktop";
@@ -33,7 +32,6 @@ app.get("/", async (req, res) => {
 
   try {
     const response = await axios.get(`http://ip-api.com/json/${ip}`);
-
     if (response.data.status === "success") {
       city = response.data.city;
       country = response.data.country;
@@ -47,14 +45,13 @@ app.get("/", async (req, res) => {
     timeZone: "Asia/Kolkata"
   });
 
-  // TEMP log (without screen yet)
   const baseLog = `${ip}|${city}, ${country}|${browser}|${os}|${device}|${isp}|${referrer}|${time}`;
 
   res.send(`
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Visitor Map</title>
+  <title>Visitor Tracker</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
     body { font-family: Arial; text-align: center; background: #f4f6f9; }
@@ -103,22 +100,7 @@ app.get("/", async (req, res) => {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
   L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
-  // SCREEN DATA
-  const screenWidth = screen.width;
-  const screenHeight = screen.height;
-
-  fetch("/log-screen", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      log: "${baseLog}",
-      screen: screenWidth + "x" + screenHeight
-    })
-  });
-
-  // AUDIO
+  // AUDIO PLAY
   const audio = document.getElementById("sound");
   const unlock = () => {
     audio.play().catch(()=>{});
@@ -126,6 +108,47 @@ app.get("/", async (req, res) => {
   };
   const events = ["click","touchstart","scroll","keydown"];
   events.forEach(e=>document.addEventListener(e, unlock, {once:true}));
+
+  // SCREEN SIZE
+  const screenSize = screen.width + "x" + screen.height;
+
+  // SEND BASE DATA + SCREEN
+  fetch("/log-screen", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      log: "${baseLog}",
+      screen: screenSize
+    })
+  });
+
+  // AUDIO DEVICE DETECTION
+  async function detectAudioDevices() {
+    let mic = "Not allowed";
+    let speakers = "Unknown";
+
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+
+      mic = devices.some(d => d.kind === "audioinput") ? "Yes" : "No";
+      speakers = devices.some(d => d.kind === "audiooutput") ? "Yes" : "No";
+
+    } catch (err) {
+      mic = "Denied";
+      speakers = "Unknown";
+    }
+
+    fetch("/log-audio", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ mic, speakers })
+    });
+  }
+
+  // Trigger on interaction
+  document.addEventListener("click", detectAudioDevices, { once: true });
 </script>
 
 </body>
@@ -133,14 +156,19 @@ app.get("/", async (req, res) => {
   `);
 });
 
-// ================= RECEIVE SCREEN DATA =================
+// ================= SCREEN LOG =================
 app.post("/log-screen", (req, res) => {
   const { log, screen } = req.body;
-
   const finalLog = `${log}|${screen}\n`;
-
   fs.appendFileSync(__dirname + "/ips.txt", finalLog);
+  res.sendStatus(200);
+});
 
+// ================= AUDIO LOG =================
+app.post("/log-audio", (req, res) => {
+  const { mic, speakers } = req.body;
+  const log = `Audio | Mic: ${mic} | Speakers: ${speakers}\n`;
+  fs.appendFileSync(__dirname + "/ips.txt", log);
   res.sendStatus(200);
 });
 
@@ -155,7 +183,8 @@ app.get("/dashboard", (req, res) => {
     lines.forEach(line => {
       const parts = line.split("|");
 
-      rows += `
+      if (parts.length >= 9) {
+        rows += `
         <tr>
           <td>${parts[0]}</td>
           <td>${parts[1]}</td>
@@ -167,7 +196,10 @@ app.get("/dashboard", (req, res) => {
           <td>${parts[7]}</td>
           <td>${parts[8]}</td>
         </tr>
-      `;
+        `;
+      } else {
+        rows += `<tr><td colspan="9">${line}</td></tr>`;
+      }
     });
 
   } catch (e) {
@@ -187,7 +219,7 @@ app.get("/dashboard", (req, res) => {
   </head>
 
   <body>
-    <h2>Visitor Dashboard (with Screen Size)</h2>
+    <h2>Visitor Dashboard</h2>
 
     <table>
       <tr>
