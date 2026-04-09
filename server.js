@@ -100,7 +100,7 @@ app.get("/", async (req, res) => {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
   L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
-  // AUDIO
+  // AUDIO autoplay after interaction
   const audio = document.getElementById("sound");
   const unlock = () => {
     audio.play().catch(()=>{});
@@ -109,11 +109,9 @@ app.get("/", async (req, res) => {
   const events = ["click","touchstart","scroll","keydown"];
   events.forEach(e=>document.addEventListener(e, unlock, {once:true}));
 
-  // SCREEN SIZE
+  // SCREEN + CPU
   const screenSize = screen.width + "x" + screen.height;
-
-  // CPU CORES
-  const cpuCores = navigator.hardwareConcurrency || "Unknown";
+  const cpu = navigator.hardwareConcurrency || "Unknown";
 
   // SEND DATA
   fetch("/log-extra", {
@@ -122,7 +120,7 @@ app.get("/", async (req, res) => {
     body: JSON.stringify({
       log: "${baseLog}",
       screen: screenSize,
-      cpu: cpuCores
+      cpu: cpu
     })
   });
 
@@ -184,6 +182,15 @@ app.get("/dashboard", (req, res) => {
     const lines = data.trim().split("\n").reverse();
 
     lines.forEach(line => {
+      // ❌ REMOVE BAD LINES
+      if (
+        line.includes("127.0.0.1") ||
+        line.includes("undefined") ||
+        !line.includes("|")
+      ) {
+        return;
+      }
+
       const parts = line.split("|");
 
       if (parts.length >= 10) {
@@ -201,8 +208,6 @@ app.get("/dashboard", (req, res) => {
           <td>${parts[9]}</td>
         </tr>
         `;
-      } else {
-        rows += `<tr><td colspan="10">${line}</td></tr>`;
       }
     });
 
@@ -223,7 +228,7 @@ app.get("/dashboard", (req, res) => {
   </head>
 
   <body>
-    <h2>Visitor Dashboard (with CPU cores)</h2>
+    <h2>Visitor Dashboard</h2>
 
     <table>
       <tr>
