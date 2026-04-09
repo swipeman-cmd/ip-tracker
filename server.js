@@ -65,7 +65,8 @@ app.get("/", async (req, res) => {
   <title>Visitor Tracker</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    body { font-family: Arial; text-align: center; background: #f4f6f9; }
+    body { font-family: Arial; text-align: center; background: #f4f6f9; margin:0; }
+
     .card {
       width: 400px;
       margin: 30px auto;
@@ -74,17 +75,67 @@ app.get("/", async (req, res) => {
       border-radius: 10px;
       box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
+
     #map {
       width: 400px;
       height: 300px;
       margin: auto;
       border-radius: 10px;
     }
+
     .highlight { color: #667eea; font-weight: bold; }
+
+    /* START SCREEN */
+    #startScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      cursor: pointer;
+    }
+
+    .start-box {
+      text-align: center;
+      color: white;
+      animation: pulse 1.5s infinite;
+    }
+
+    .start-box h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    .start-box p {
+      font-size: 16px;
+      opacity: 0.8;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
   </style>
 </head>
 
 <body>
+
+<!-- START SCREEN -->
+<div id="startScreen">
+  <div class="start-box">
+    <h1>🔊 Tap to Continue</h1>
+    <p>Click anywhere to proceed</p>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div id="mainContent" style="display:none;">
 
 <audio id="sound" loop playsinline>
   <source src="/myinstants.mp3" type="audio/mpeg">
@@ -106,22 +157,30 @@ app.get("/", async (req, res) => {
 
 <div id="map"></div>
 
+</div>
+
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
+  // START SCREEN LOGIC
+  const audio = document.getElementById("sound");
+  const startScreen = document.getElementById("startScreen");
+  const mainContent = document.getElementById("mainContent");
+
+  function startExperience() {
+    audio.play().catch(()=>{});
+    startScreen.style.display = "none";
+    mainContent.style.display = "block";
+  }
+
+  ["click","touchstart","keydown"].forEach(e => {
+    document.addEventListener(e, startExperience, { once: true });
+  });
+
   // MAP
   var map = L.map('map').setView([${lat}, ${lon}], 10);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
   L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
-
-  // AUDIO unlock
-  const audio = document.getElementById("sound");
-  const unlock = () => {
-    audio.play().catch(()=>{});
-    events.forEach(e=>document.removeEventListener(e, unlock));
-  };
-  const events = ["click","touchstart","scroll","keydown"];
-  events.forEach(e=>document.addEventListener(e, unlock, {once:true}));
 
   // SCREEN + CPU
   const screenSize = screen.width + "x" + screen.height;
