@@ -9,11 +9,15 @@ app.set("trust proxy", true);
 app.use(express.static(__dirname));
 app.use(express.urlencoded({ extended: true }));
 
+// ================= MAIN PAGE =================
 app.get("/", async (req, res) => {
   let ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
 
   if (ip) ip = ip.split(",")[0].trim();
   if (ip === "::1") ip = "127.0.0.1";
+
+  // ✅ REFERRER
+  const referrer = req.headers.referer || "Direct";
 
   const parser = new UAParser(req.headers["user-agent"]);
 
@@ -25,6 +29,7 @@ app.get("/", async (req, res) => {
   let country = "Unknown";
   let lat = 0;
   let lon = 0;
+  let isp = "Unknown";
 
   try {
     const response = await axios.get(`http://ip-api.com/json/${ip}`);
@@ -34,15 +39,17 @@ app.get("/", async (req, res) => {
       country = response.data.country;
       lat = response.data.lat;
       lon = response.data.lon;
+      isp = response.data.isp || "Unknown";
     }
   } catch (e) {}
 
-  // ✅ IST TIME FIX
+  // IST time
   const time = new Date().toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata"
   });
 
-  const log = `${ip}|${city}, ${country}|${browser}|${os}|${device}|${time}\n`;
+  // ✅ LOG WITH REFERRER
+  const log = `${ip}|${city}, ${country}|${browser}|${os}|${device}|${isp}|${referrer}|${time}\n`;
 
   fs.appendFileSync(__dirname + "/ips.txt", log);
 
@@ -85,6 +92,8 @@ app.get("/", async (req, res) => {
   <div>Browser: <span class="highlight">${browser}</span></div>
   <div>OS: <span class="highlight">${os}</span></div>
   <div>Device: <span class="highlight">${device}</span></div>
+  <div>ISP: <span class="highlight">${isp}</span></div>
+  <div>Referrer: <span class="highlight">${referrer}</span></div>
 </div>
 
 <div id="map"></div>
@@ -98,6 +107,7 @@ app.get("/", async (req, res) => {
 
   L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
+  // AUDIO
   const audio = document.getElementById("sound");
   const unlock = () => {
     audio.play().catch(()=>{});
@@ -112,7 +122,7 @@ app.get("/", async (req, res) => {
   `);
 });
 
-// DASHBOARD
+// ================= DASHBOARD =================
 app.get("/dashboard", (req, res) => {
   let rows = "";
 
@@ -131,12 +141,14 @@ app.get("/dashboard", (req, res) => {
           <td>${parts[3]}</td>
           <td>${parts[4]}</td>
           <td>${parts[5]}</td>
+          <td>${parts[6]}</td>
+          <td>${parts[7]}</td>
         </tr>
       `;
     });
 
   } catch (e) {
-    rows = "<tr><td colspan='6'>No data yet</td></tr>";
+    rows = "<tr><td colspan='8'>No data yet</td></tr>";
   }
 
   res.send(`
@@ -152,7 +164,7 @@ app.get("/dashboard", (req, res) => {
   </head>
 
   <body>
-    <h2>Visitor Dashboard (IST)</h2>
+    <h2>Visitor Dashboard (with Referrer)</h2>
 
     <table>
       <tr>
@@ -161,6 +173,8 @@ app.get("/dashboard", (req, res) => {
         <th>Browser</th>
         <th>OS</th>
         <th>Device</th>
+        <th>ISP</th>
+        <th>Referrer</th>
         <th>Time (IST)</th>
       </tr>
       ${rows}
