@@ -1,5 +1,7 @@
 const express = require("express");
 const fs = require("fs");
+const axios = require("axios");
+
 const app = express();
 
 app.use(express.urlencoded({ extended: true }));
@@ -8,29 +10,45 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/", (req, res) => {
   res.send(`
     <h2>Consent Required</h2>
-    <p>We log your IP address for demonstration purposes.</p>
+    <p>We log your IP address and approximate location for demonstration purposes.</p>
     <form method="POST" action="/accept">
       <button type="submit">I Agree</button>
     </form>
   `);
 });
 
-// Handle consent + log IP
-app.post("/accept", (req, res) => {
-  const ip =
+// Handle consent + log IP + location
+app.post("/accept", async (req, res) => {
+  let ip =
     req.headers["x-forwarded-for"] || req.socket.remoteAddress;
 
-  const log = `IP: ${ip} - ${new Date().toISOString()}\n`;
+  // Clean IP (sometimes comes as multiple)
+  if (ip.includes(",")) {
+    ip = ip.split(",")[0];
+  }
 
-  fs.appendFileSync("ips.txt", log);
+  try {
+    const response = await axios.get(`https://ipapi.co/${ip}/json/`);
+    const data = response.data;
 
-  console.log(log);
+    const city = data.city || "Unknown";
+    const country = data.country_name || "Unknown";
 
-  res.send("<h3>Thanks! Your IP has been logged.</h3>");
+    const log = `IP: ${ip} | ${city}, ${country} | ${new Date().toISOString()}\n`;
+
+    fs.appendFileSync(__dirname + "/ips.txt", log);
+
+    console.log(log);
+
+  } catch (error) {
+    console.log("Error fetching location:", error.message);
+  }
+
+  res.send("<h3>Thanks! Your IP and location have been logged.</h3>");
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("Server running at http://localhost:3000");
+  console.log(`Server running on port ${PORT}`);
 });
