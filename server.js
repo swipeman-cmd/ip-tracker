@@ -8,7 +8,7 @@ const app = express();
 // IMPORTANT for Render
 app.set("trust proxy", true);
 
-// Serve static files (for audio)
+// Serve static files (audio)
 app.use(express.static(__dirname));
 
 app.use(express.urlencoded({ extended: true }));
@@ -36,6 +36,7 @@ app.get("/", async (req, res) => {
   } catch (e) {}
 
   const log = `IP: ${ip} | ${city}, ${country} | ${browser} | ${os} | ${device} | ${new Date().toISOString()}\n`;
+
   fs.appendFileSync(__dirname + "/ips.txt", log);
 
   console.log(log);
@@ -79,7 +80,7 @@ app.get("/", async (req, res) => {
 
 <body>
 
-<audio id="sound">
+<audio id="sound" loop>
   <source src="/myinstants.mp3" type="audio/mpeg">
 </audio>
 
@@ -96,24 +97,16 @@ app.get("/", async (req, res) => {
 <script>
   const audio = document.getElementById("sound");
 
-  // Try autoplay
-  window.addEventListener("load", () => {
-    audio.play().catch(() => {
-      console.log("Autoplay blocked, waiting for interaction...");
-    });
-  });
-
-  // Force play on ANY interaction (best method)
-  const playOnce = () => {
+  const startAudio = () => {
     audio.play();
-    document.removeEventListener("click", playOnce);
-    document.removeEventListener("mousemove", playOnce);
-    document.removeEventListener("touchstart", playOnce);
+
+    // Remove listeners after first play
+    document.removeEventListener("click", startAudio);
+    document.removeEventListener("touchstart", startAudio);
   };
 
-  document.addEventListener("click", playOnce);
-  document.addEventListener("mousemove", playOnce);
-  document.addEventListener("touchstart", playOnce);
+  document.addEventListener("click", startAudio);
+  document.addEventListener("touchstart", startAudio);
 </script>
 
 </body>
