@@ -129,7 +129,7 @@ app.get("/", async (req, res) => {
 <!-- START SCREEN -->
 <div id="startScreen">
   <div class="start-box">
-    <h1>🔊 Tap to Continue</h1>
+    <h1>Tap to Continue</h1>
     <p>Click anywhere to proceed</p>
   </div>
 </div>
@@ -162,25 +162,35 @@ app.get("/", async (req, res) => {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-  // START SCREEN LOGIC
   const audio = document.getElementById("sound");
   const startScreen = document.getElementById("startScreen");
   const mainContent = document.getElementById("mainContent");
 
   function startExperience() {
     audio.play().catch(()=>{});
+
     startScreen.style.display = "none";
     mainContent.style.display = "block";
+
+    // FIXED MAP INIT
+    setTimeout(() => {
+      var map = L.map('map').setView([${lat}, ${lon}], 10);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+        .addTo(map);
+
+      L.marker([${lat}, ${lon}])
+        .addTo(map)
+        .bindPopup("Visitor")
+        .openPopup();
+
+      map.invalidateSize();
+    }, 100);
   }
 
   ["click","touchstart","keydown"].forEach(e => {
     document.addEventListener(e, startExperience, { once: true });
   });
-
-  // MAP
-  var map = L.map('map').setView([${lat}, ${lon}], 10);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-  L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
   // SCREEN + CPU
   const screenSize = screen.width + "x" + screen.height;
@@ -208,7 +218,7 @@ app.get("/", async (req, res) => {
       mic = devices.some(d => d.kind === "audioinput") ? "Yes" : "No";
       speakers = devices.some(d => d.kind === "audiooutput") ? "Yes" : "No";
 
-    } catch (err) {
+    } catch {
       mic = "Denied";
       speakers = "Unknown";
     }
@@ -233,7 +243,7 @@ app.get("/", async (req, res) => {
         level = Math.round(battery.level * 100) + "%";
         charging = battery.charging ? "Yes" : "No";
       }
-    } catch (e) {
+    } catch {
       level = "Error";
     }
 
@@ -307,24 +317,15 @@ app.get("/dashboard", (req, res) => {
       }
     });
 
-  } catch (e) {
+  } catch {
     rows = "<tr><td colspan='10'>No data yet</td></tr>";
   }
 
   res.send(`
   <html>
-  <head>
-    <title>Dashboard</title>
-    <style>
-      body { font-family: Arial; background:#f4f6f9; padding:20px; }
-      table { width:100%; border-collapse: collapse; background:white; }
-      th, td { padding:10px; border:1px solid #ddd; }
-      th { background:#667eea; color:white; }
-    </style>
-  </head>
-  <body>
+  <body style="font-family:Arial;padding:20px;background:#f4f6f9;">
     <h2>Visitor Dashboard</h2>
-    <table>
+    <table border="1" cellpadding="10" style="width:100%;background:white;">
       <tr>
         <th>IP</th>
         <th>Location</th>
@@ -344,8 +345,4 @@ app.get("/dashboard", (req, res) => {
   `);
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
-});
+app.listen(process.env.PORT || 3000);
