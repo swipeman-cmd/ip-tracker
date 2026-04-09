@@ -25,19 +25,30 @@ app.get("/", async (req, res) => {
   const device = parser.getDevice().type || "Desktop";
 
   let city = "Unknown";
+  let region = "Unknown";
   let country = "Unknown";
   let lat = 0;
   let lon = 0;
   let isp = "Unknown";
+  let org = "Unknown";
+  let timezone = "Unknown";
+  let zip = "Unknown";
 
   try {
-    const response = await axios.get(`http://ip-api.com/json/${ip}`);
+    const response = await axios.get(
+      `http://ip-api.com/json/${ip}?fields=status,country,regionName,city,lat,lon,isp,org,timezone,zip`
+    );
+
     if (response.data.status === "success") {
-      city = response.data.city;
-      country = response.data.country;
-      lat = response.data.lat;
-      lon = response.data.lon;
+      city = response.data.city || "Unknown";
+      region = response.data.regionName || "Unknown";
+      country = response.data.country || "Unknown";
+      lat = response.data.lat || 0;
+      lon = response.data.lon || 0;
       isp = response.data.isp || "Unknown";
+      org = response.data.org || "Unknown";
+      timezone = response.data.timezone || "Unknown";
+      zip = response.data.zip || "Unknown";
     }
   } catch (e) {}
 
@@ -45,7 +56,7 @@ app.get("/", async (req, res) => {
     timeZone: "Asia/Kolkata"
   });
 
-  const baseLog = `${ip}|${city}, ${country}|${browser}|${os}|${device}|${isp}|${referrer}|${time}`;
+  const baseLog = `${ip}|${city}, ${region}, ${country}|${browser}|${os}|${device}|${isp} (${org})|${referrer}|${time}`;
 
   res.send(`
 <!DOCTYPE html>
@@ -82,7 +93,10 @@ app.get("/", async (req, res) => {
 <div class="card">
   <h2>Visitor Info</h2>
   <div>IP: <span class="highlight">${ip}</span></div>
-  <div>Location: <span class="highlight">${city}, ${country}</span></div>
+  <div>Location: <span class="highlight">${city}, ${region}, ${country}</span></div>
+  <div>ZIP: <span class="highlight">${zip}</span></div>
+  <div>Timezone: <span class="highlight">${timezone}</span></div>
+  <div>Org: <span class="highlight">${org}</span></div>
   <div>Browser: <span class="highlight">${browser}</span></div>
   <div>OS: <span class="highlight">${os}</span></div>
   <div>Device: <span class="highlight">${device}</span></div>
