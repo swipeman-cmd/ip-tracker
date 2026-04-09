@@ -5,63 +5,50 @@ const UAParser = require("ua-parser-js");
 
 const app = express();
 
-// VERY IMPORTANT for Render
+// IMPORTANT for Render
 app.set("trust proxy", true);
+
+// Serve static files (for audio)
+app.use(express.static(__dirname));
 
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", async (req, res) => {
-  // Get real IP
   let ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
 
-  if (ip) {
-    ip = ip.split(",")[0].trim();
-  }
-
+  if (ip) ip = ip.split(",")[0].trim();
   if (ip === "::1") ip = "127.0.0.1";
 
-  // Get browser info
   const userAgent = req.headers["user-agent"];
   const parser = new UAParser(userAgent);
 
-  const browser = parser.getBrowser();
-  const os = parser.getOS();
-  const device = parser.getDevice();
-
-  const browserName = browser.name || "Unknown";
-  const osName = os.name || "Unknown";
-  const deviceType = device.type || "Desktop";
+  const browser = parser.getBrowser().name || "Unknown";
+  const os = parser.getOS().name || "Unknown";
+  const device = parser.getDevice().type || "Desktop";
 
   let city = "Unknown";
   let country = "Unknown";
 
   try {
     const response = await axios.get(`https://ipapi.co/${ip}/json/`);
-    const data = response.data;
+    city = response.data.city || "Unknown";
+    country = response.data.country_name || "Unknown";
+  } catch (e) {}
 
-    city = data.city || "Unknown";
-    country = data.country_name || "Unknown";
-
-  } catch (error) {
-    console.log("Location error:", error.message);
-  }
-
-  const log = `IP: ${ip} | ${city}, ${country} | Browser: ${browserName} | OS: ${osName} | Device: ${deviceType} | ${new Date().toISOString()}\n`;
-
+  const log = `IP: ${ip} | ${city}, ${country} | ${browser} | ${os} | ${device} | ${new Date().toISOString()}\n`;
   fs.appendFileSync(__dirname + "/ips.txt", log);
 
   console.log(log);
 
-  // UI Response
   res.send(`
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Visitor Info</title>
+  <title>Visitor Logged</title>
   <style>
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
+      font-family: Arial;
       background: linear-gradient(135deg, #667eea, #764ba2);
       height: 100vh;
       display: flex;
@@ -78,13 +65,8 @@ app.get("/", async (req, res) => {
       width: 400px;
     }
 
-    h2 {
-      margin-bottom: 10px;
-    }
-
     .info {
       margin-top: 10px;
-      font-size: 15px;
       color: #555;
     }
 
@@ -96,29 +78,44 @@ app.get("/", async (req, res) => {
 </head>
 
 <body>
-  <div class="card">
-    <h2>Visitor Logged</h2>
 
-    <div class="info">
-      IP: <span class="highlight">${ip}</span>
-    </div>
+<audio id="sound">
+  <source src="/myinstants.mp3" type="audio/mpeg">
+</audio>
 
-    <div class="info">
-      Location: <span class="highlight">${city}, ${country}</span>
-    </div>
+<div class="card">
+  <h2>Visitor Logged</h2>
 
-    <div class="info">
-      Browser: <span class="highlight">${browserName}</span>
-    </div>
+  <div class="info">IP: <span class="highlight">${ip}</span></div>
+  <div class="info">Location: <span class="highlight">${city}, ${country}</span></div>
+  <div class="info">Browser: <span class="highlight">${browser}</span></div>
+  <div class="info">OS: <span class="highlight">${os}</span></div>
+  <div class="info">Device: <span class="highlight">${device}</span></div>
+</div>
 
-    <div class="info">
-      OS: <span class="highlight">${osName}</span>
-    </div>
+<script>
+  const audio = document.getElementById("sound");
 
-    <div class="info">
-      Device: <span class="highlight">${deviceType}</span>
-    </div>
-  </div>
+  // Try autoplay
+  window.addEventListener("load", () => {
+    audio.play().catch(() => {
+      console.log("Autoplay blocked, waiting for interaction...");
+    });
+  });
+
+  // Force play on ANY interaction (best method)
+  const playOnce = () => {
+    audio.play();
+    document.removeEventListener("click", playOnce);
+    document.removeEventListener("mousemove", playOnce);
+    document.removeEventListener("touchstart", playOnce);
+  };
+
+  document.addEventListener("click", playOnce);
+  document.addEventListener("mousemove", playOnce);
+  document.addEventListener("touchstart", playOnce);
+</script>
+
 </body>
 </html>
   `);
@@ -127,5 +124,5 @@ app.get("/", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log("Server running on port " + PORT);
 });
