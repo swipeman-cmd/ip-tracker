@@ -19,6 +19,7 @@ app.get("/", async (req, res) => {
   if (ip) ip = ip.split(",")[0].trim();
   if (ip === "::1") ip = "127.0.0.1";
 
+  // Browser info
   const userAgent = req.headers["user-agent"];
   const parser = new UAParser(userAgent);
 
@@ -30,10 +31,18 @@ app.get("/", async (req, res) => {
   let country = "Unknown";
 
   try {
-    const response = await axios.get(`https://ipapi.co/${ip}/json/`);
-    city = response.data.city || "Unknown";
-    country = response.data.country_name || "Unknown";
-  } catch (e) {}
+    const response = await axios.get(`http://ip-api.com/json/${ip}`);
+
+    if (response.data.status === "success") {
+      city = response.data.city || "Unknown";
+      country = response.data.country || "Unknown";
+    } else {
+      console.log("Location API failed:", response.data);
+    }
+
+  } catch (error) {
+    console.log("Location error:", error.message);
+  }
 
   const log = `IP: ${ip} | ${city}, ${country} | ${browser} | ${os} | ${device} | ${new Date().toISOString()}\n`;
 
@@ -100,7 +109,6 @@ app.get("/", async (req, res) => {
   const startAudio = () => {
     audio.play();
 
-    // Remove listeners after first play
     document.removeEventListener("click", startAudio);
     document.removeEventListener("touchstart", startAudio);
   };
