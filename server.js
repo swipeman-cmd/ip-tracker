@@ -9,6 +9,7 @@ app.set("trust proxy", true);
 app.use(express.static(__dirname));
 app.use(express.urlencoded({ extended: true }));
 
+// ================= MAIN ROUTE =================
 app.get("/", async (req, res) => {
   let ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
 
@@ -35,59 +36,35 @@ app.get("/", async (req, res) => {
       lat = response.data.lat;
       lon = response.data.lon;
     }
-  } catch (e) {
-    console.log("Location error:", e.message);
-  }
+  } catch (e) {}
 
-  const log = `IP: ${ip} | ${city}, ${country} | ${browser} | ${os} | ${device} | ${new Date().toISOString()}\n`;
+  const log = `${ip}|${city}, ${country}|${browser}|${os}|${device}|${new Date().toISOString()}\n`;
   fs.appendFileSync(__dirname + "/ips.txt", log);
-
-  console.log(log);
 
   res.send(`
 <!DOCTYPE html>
 <html>
 <head>
   <title>Visitor Map</title>
-
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
   <style>
-    body {
-      margin: 0;
-      font-family: Arial;
-      background: #f4f6f9;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-top: 30px;
-    }
-
+    body { font-family: Arial; text-align: center; background: #f4f6f9; }
     .card {
       width: 400px;
+      margin: 30px auto;
       padding: 20px;
       background: white;
       border-radius: 10px;
       box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-      text-align: center;
     }
-
     #map {
-      width: 400px;   /* SAME WIDTH AS CARD */
+      width: 400px;
       height: 300px;
-      margin-top: 20px;
+      margin: auto;
       border-radius: 10px;
-      overflow: hidden;
     }
-
-    .info {
-      margin-top: 10px;
-    }
-
-    .highlight {
-      color: #667eea;
-      font-weight: bold;
-    }
+    .highlight { color: #667eea; font-weight: bold; }
+    a { display:block; margin-top:10px; }
   </style>
 </head>
 
@@ -99,12 +76,13 @@ app.get("/", async (req, res) => {
 
 <div class="card">
   <h2>Visitor Info</h2>
+  <div>IP: <span class="highlight">${ip}</span></div>
+  <div>Location: <span class="highlight">${city}, ${country}</span></div>
+  <div>Browser: <span class="highlight">${browser}</span></div>
+  <div>OS: <span class="highlight">${os}</span></div>
+  <div>Device: <span class="highlight">${device}</span></div>
 
-  <div class="info">IP: <span class="highlight">${ip}</span></div>
-  <div class="info">Location: <span class="highlight">${city}, ${country}</span></div>
-  <div class="info">Browser: <span class="highlight">${browser}</span></div>
-  <div class="info">OS: <span class="highlight">${os}</span></div>
-  <div class="info">Device: <span class="highlight">${device}</span></div>
+  <a href="/dashboard">📊 View Dashboard</a>
 </div>
 
 <div id="map"></div>
@@ -112,37 +90,92 @@ app.get("/", async (req, res) => {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-  // MAP
   var map = L.map('map').setView([${lat}, ${lon}], 10);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-  }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-  L.marker([${lat}, ${lon}]).addTo(map)
-    .bindPopup("Visitor Location")
-    .openPopup();
+  L.marker([${lat}, ${lon}]).addTo(map).bindPopup("Visitor").openPopup();
 
   // AUDIO
   const audio = document.getElementById("sound");
-
-  const unlockAudio = () => {
-    audio.play().catch(() => {});
-
-    events.forEach(event => {
-      document.removeEventListener(event, unlockAudio);
-    });
+  const unlock = () => {
+    audio.play().catch(()=>{});
+    events.forEach(e=>document.removeEventListener(e, unlock));
   };
-
-  const events = ["click", "touchstart", "pointerdown", "keydown", "scroll"];
-
-  events.forEach(event => {
-    document.addEventListener(event, unlockAudio, { once: true });
-  });
+  const events = ["click","touchstart","scroll","keydown"];
+  events.forEach(e=>document.addEventListener(e, unlock, {once:true}));
 </script>
 
 </body>
 </html>
+  `);
+});
+
+// ================= DASHBOARD =================
+app.get("/dashboard", (req, res) => {
+  let rows = "";
+
+  try {
+    const data = fs.readFileSync(__dirname + "/ips.txt", "utf-8");
+    const lines = data.trim().split("\n").reverse();
+
+    lines.forEach(line => {
+      const parts = line.split("|");
+
+      rows += `
+        <tr>
+          <td>${parts[0]}</td>
+          <td>${parts[1]}</td>
+          <td>${parts[2]}</td>
+          <td>${parts[3]}</td>
+          <td>${parts[4]}</td>
+          <td>${parts[5]}</td>
+        </tr>
+      `;
+    });
+
+  } catch (e) {
+    rows = "<tr><td colspan='6'>No data yet</td></tr>";
+  }
+
+  res.send(`
+  <html>
+  <head>
+    <title>Dashboard</title>
+    <style>
+      body { font-family: Arial; background:#f4f6f9; padding:20px; }
+      table {
+        width:100%;
+        border-collapse: collapse;
+        background:white;
+      }
+      th, td {
+        padding:10px;
+        border:1px solid #ddd;
+      }
+      th {
+        background:#667eea;
+        color:white;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h2>Visitor Dashboard</h2>
+
+    <table>
+      <tr>
+        <th>IP</th>
+        <th>Location</th>
+        <th>Browser</th>
+        <th>OS</th>
+        <th>Device</th>
+        <th>Time</th>
+      </tr>
+      ${rows}
+    </table>
+  </body>
+  </html>
   `);
 });
 
