@@ -9,7 +9,7 @@ app.set("trust proxy", true);
 app.use(express.static(__dirname));
 app.use(express.urlencoded({ extended: true }));
 
-// ================= MAIN ROUTE =================
+// ================= MAIN PAGE =================
 app.get("/", async (req, res) => {
   let ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
 
@@ -64,7 +64,6 @@ app.get("/", async (req, res) => {
       border-radius: 10px;
     }
     .highlight { color: #667eea; font-weight: bold; }
-    a { display:block; margin-top:10px; }
   </style>
 </head>
 
@@ -81,8 +80,6 @@ app.get("/", async (req, res) => {
   <div>Browser: <span class="highlight">${browser}</span></div>
   <div>OS: <span class="highlight">${os}</span></div>
   <div>Device: <span class="highlight">${device}</span></div>
-
-  <a href="/dashboard">📊 View Dashboard</a>
 </div>
 
 <div id="map"></div>
@@ -111,7 +108,7 @@ app.get("/", async (req, res) => {
   `);
 });
 
-// ================= DASHBOARD =================
+// ================= DASHBOARD (STILL EXISTS) =================
 app.get("/dashboard", (req, res) => {
   let rows = "";
 
@@ -144,19 +141,9 @@ app.get("/dashboard", (req, res) => {
     <title>Dashboard</title>
     <style>
       body { font-family: Arial; background:#f4f6f9; padding:20px; }
-      table {
-        width:100%;
-        border-collapse: collapse;
-        background:white;
-      }
-      th, td {
-        padding:10px;
-        border:1px solid #ddd;
-      }
-      th {
-        background:#667eea;
-        color:white;
-      }
+      table { width:100%; border-collapse: collapse; background:white; }
+      th, td { padding:10px; border:1px solid #ddd; }
+      th { background:#667eea; color:white; }
     </style>
   </head>
 
