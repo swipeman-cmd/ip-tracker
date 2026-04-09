@@ -57,22 +57,27 @@ app.get("/", async (req, res) => {
       margin: 0;
       font-family: Arial;
       background: #f4f6f9;
-      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 30px;
     }
 
     .card {
-      margin: 20px auto;
-      padding: 20px;
       width: 400px;
+      padding: 20px;
       background: white;
       border-radius: 10px;
       box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      text-align: center;
     }
 
     #map {
-      height: 400px;
-      margin: 20px;
+      width: 400px;   /* SAME WIDTH AS CARD */
+      height: 300px;
+      margin-top: 20px;
       border-radius: 10px;
+      overflow: hidden;
     }
 
     .info {
@@ -118,28 +123,18 @@ app.get("/", async (req, res) => {
     .bindPopup("Visitor Location")
     .openPopup();
 
-  // AUDIO (NO BUTTON, WORKS ON ANY INTERACTION)
+  // AUDIO
   const audio = document.getElementById("sound");
 
   const unlockAudio = () => {
-    audio.play().then(() => {
-      console.log("Audio started");
-    }).catch(err => {
-      console.log("Blocked:", err);
-    });
+    audio.play().catch(() => {});
 
     events.forEach(event => {
       document.removeEventListener(event, unlockAudio);
     });
   };
 
-  const events = [
-    "click",
-    "touchstart",
-    "pointerdown",
-    "keydown",
-    "scroll"
-  ];
+  const events = ["click", "touchstart", "pointerdown", "keydown", "scroll"];
 
   events.forEach(event => {
     document.addEventListener(event, unlockAudio, { once: true });
