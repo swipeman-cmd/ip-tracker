@@ -107,12 +107,12 @@ app.get("/", async (req, res) => {
     }
 
 .start-box h1 {
-  font-size: 64px;   /* 🔥 BIGGER */
+  font-size: 100px;   /* 🔥 BIGGER */
   margin-bottom: 15px;
 }
 
 .start-box p {
-  font-size: 24px;   /* 🔥 BIGGER */
+  font-size: 70px;   /* 🔥 BIGGER */
   opacity: 0.9;
 }
 
